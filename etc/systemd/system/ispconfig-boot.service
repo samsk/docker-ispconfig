@@ -1,0 +1,10 @@
+[Unit]
+Description=ISPConfig boot
+DefaultDependencies=no
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/rsync -auv /etc-dist/ /etc/
+
+[Install]
+WantedBy=sysinit.target

@@ -1,0 +1,14 @@
+#!/bin/bash
+
+echo "#ISPConfig inherited variables" >/etc/environment.ispconfig;
+env | awk '/^isp_/' >>/etc/environment.ispconfig;
+chmod 0600 /etc/environment.ispconfig;
+
+vars=`env | awk -F '=' '/^isp_/ {print $1}'`;
+for var in $vars;
+do
+   export $var=;
+   unset $var;
+done;
+
+exec /lib/systemd/systemd "$@";

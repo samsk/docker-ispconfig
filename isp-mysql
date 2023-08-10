@@ -1,0 +1,4 @@
+#!/bin/sh
+
+source /etc/environment.ispconfig
+exec mysql -u root -h$isp_mysql_hostname -p$isp_mysql_root_password

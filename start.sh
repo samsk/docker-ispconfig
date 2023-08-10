@@ -1,20 +1,28 @@
 #!/bin/bash
 
+# restore dir tree
+for i in /etc/dirtree/*.tree;
+do 
+   [ -e "$i" ] && bash "$i";
+done;
+
+source /etc/environment.ispconfig || exit 1
+
 echo $(grep $(hostname) /etc/hosts | cut -f1) localhost >> /etc/hosts
 
-envsubst < /root/autoinstall.ini > /tmp/ispconfig3_install/install/autoinstall.ini
+envsubst < /root/autoinstall.ini > /root/ispconfig3_install/install/autoinstall.ini
 
 echo $isp_hostname > /etc/mailname
 
-cd /tmp/ispconfig3_install/install/
+cd /root/ispconfig3_install/install/
 
 if [ -f /usr/local/ispconfig/interface/lib/config.inc.php ]; 
 then
   # Fixed: Table already exists
-  rm /tmp/ispconfig3_install/install/sql/incremental/upd_dev_collection.sql
-	/wait-for-it.sh $isp_mysql_hostname:$isp_mysql_port -- php -q update.php --autoinstall=/tmp/ispconfig3_install/install/autoinstall.ini
+  rm /root/ispconfig3_install/install/sql/incremental/upd_dev_collection.sql
+	/wait-for-it.sh $isp_mysql_hostname:$isp_mysql_port -- php -q update.php --autoinstall=/root/ispconfig3_install/install/autoinstall.ini
 else
-	/wait-for-it.sh $isp_mysql_hostname:$isp_mysql_port -- php -q install.php --autoinstall=/tmp/ispconfig3_install/install/autoinstall.ini
+	/wait-for-it.sh $isp_mysql_hostname:$isp_mysql_port -- php -q install.php --autoinstall=/root/ispconfig3_install/install/autoinstall.ini
 fi
 
 # Fix from amavis ownerchip that prevents amavis to start
@@ -29,7 +37,7 @@ echo message_size_limit=52428800 >> /etc/postfix/main.cf
 #echo "FLUSH PRIVILEGES;" | mysql -u root -h$isp_mysql_hostname -p$isp_mysql_root_password
 
 # Bugfix ISPconfig mysql error
-echo "ALTER TABLE dbispconfig.sys_user MODIFY passwort VARCHAR(140);"  | mysql -u root -h$isp_mysql_hostname -P$isp_mysql_port -p$isp_mysql_root_password
+echo "ALTER TABLE ${isp_mysql_master_database}.sys_user MODIFY passwort VARCHAR(140);"  | mysql -u root -h$isp_mysql_hostname -P$isp_mysql_port -p$isp_mysql_root_password
 echo "FLUSH PRIVILEGES;" | mysql -u root -h$isp_mysql_hostname -P$isp_mysql_port -p$isp_mysql_root_password
 
 # Bugfix ISPconfig missing markerline
@@ -45,30 +53,32 @@ rm -rf /var/run/saslauthd
 ln -sfn /var/spool/postfix/var/run/saslauthd /var/run/saslauthd
 
 screenfetch
-
-/etc/init.d/clamav-daemon start
-
-if [ "$isp_enable_mail" == "y" ];
-then
-  /etc/init.d/courier-authdaemon start
-fi
-
-if [ "$isp_enable_dns" == "y" ];
-then
-  /etc/init.d/named start
-fi
-
-if [ "$isp_enable_nginx" == "y" ];
-then
-  /etc/init.d/php7.4-fpm start
-fi
-
-if [ "$isp_enable_apache" == "y" ];
-then
-  /etc/init.d/php7.4-fpm start
-fi
-
-/etc/init.d/cron restart
+#if [ "$isp_enable_mail" == "y" ];
+#then
+#  /etc/init.d/clamav-daemon start
+#fi
+#
+#if [ "$isp_enable_mail" == "y" ];
+#then
+#  /etc/init.d/courier-authdaemon start
+#fi
+#
+#if [ "$isp_enable_dns" == "y" ];
+#then
+#  /etc/init.d/named start
+#fi
+#
+#if [ "$isp_enable_nginx" == "y" ];
+#then
+#  /etc/init.d/php${isp_php_version}-fpm start
+#fi
+#
+#if [ "$isp_enable_apache" == "y" ];
+#then
+#  /etc/init.d/php${isp_php_version}-fpm start
+#fi
+#
+#/etc/init.d/cron restart
 
 unset isp_mysql_root_password
 unset isp_mysql_ispconfig_password
@@ -88,4 +98,6 @@ else
     /do-1st-backup.sh &
 fi
 
-/usr/bin/supervisord -c /etc/supervisor/supervisord.conf
+systemctl start pure-ftpd
+
+#exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf

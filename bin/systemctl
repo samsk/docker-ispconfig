@@ -13,6 +13,13 @@ case "$1" in
         start)
                 /etc/init.d/$SERVICE start
         ;;
+        enable)
+                /usr/sbin/update-rc.d "$SERVICE" enable
+        ;;
+        disable)
+                /usr/sbin/update-rc.d "$SERVICE" disable
+                /etc/init.d/$SERVICE stop
+        ;;
         *)
                 command systemctloriginal "$@"
         exit 1
