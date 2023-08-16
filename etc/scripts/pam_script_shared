@@ -1,0 +1,105 @@
+#!/bin/bash
+#
+# An example pam-script, which can be used as a template for your own
+#
+# The accepted list of scripts:
+#	pam_script_auth
+#	pam_script_acct
+#	pam_script_passwd
+#	pam_script_ses_open
+#	pam_script_ses_close
+#
+# The environment variables passed by pam-script onto the script
+# (all will exist but some may be null if not applicable):
+#	PAM_SERVICE	- the application that's invoking the PAM stack
+#	PAM_TYPE	- the module-type (e.g. auth,account,session,password)
+#	PAM_USER	- the user being authenticated into
+#	PAM_RUSER	- the remote user, the user invoking the application
+#	PAM_RHOST	- remote host
+#	PAM_TTY		- the controlling tty
+#	PAM_AUTHTOK	- password in readable text
+SCRIPT_DIR="/etc/scripts";
+CHROOT_PATH=/var/chroot;
+TAG="CLIENT_SFTP";
+
+#set -x;
+#exec >>/tmp/log 2>&1;
+#date
+
+# security
+PAM_USER="${PAM_USER%%/*}";
+if [ -z "$PAM_USER" ];
+then
+	echo "$0: \$PAM_USER not set !" >&2;
+	exit 1;
+fi;
+
+# only sshusers
+if ! id -nG "$PAM_USER" | grep -q sshusers;
+then
+	exit 0;
+fi;
+
+function pam_user_home() {
+	awk -F : '$1 == '"\"$PAM_USER\""' { print $6 }' /etc/passwd;
+}
+
+function chroot_dir() {
+	echo "$CHROOT_PATH/$PAM_USER";
+}
+
+function chroot_bind() {
+	sudo -E $SCRIPT_DIR/chroot_helper bind-home;
+}
+
+function chroot_mount() {
+	local dir=`chroot_dir`;
+
+	if ! mkdir -p "$dir";
+	then
+		echo "[$TAG] Failed to create home dir" >&2;
+		exit 1;
+	fi;
+
+	# check if not mounted already
+	if findmnt -M "$dir" >/dev/null;
+	then
+		return 0;
+	fi;
+
+	# findout home
+	local home=`pam_user_home`;
+	home="${home%/home/*}";
+	if [ -z "$home" ];
+	then
+		echo "[$TAG] Failed to configure home dir" >&2;
+		return 1;
+	fi;
+
+	# remote inmutable bit
+	chattr -i "$home" 2>/dev/null;
+
+	# change ownership
+	group=`id -g "$PAM_USER"`;
+	chown "root:$group" "$home";
+	chmod 755 "$home";
+
+	# set inmutable bit
+	chattr +i "$home" 2>/dev/null;
+
+	# mount
+	if ! mount --bind "$home" "$dir";
+	then
+		echo "[$TAG] Failed to bind home dir $home" >&2;
+		return 1;
+	fi;
+
+	mount --bind "$home/log" "$dir/log";
+
+	# mount dev
+#	mkdir -p "$dir/dev";
+#	mount --bind
+
+	logger -p auth.warn -t "$TAG" "mounted dir $home for user $PAM_USER";
+	return 0;
+}

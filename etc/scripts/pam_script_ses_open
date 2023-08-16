@@ -1,0 +1,35 @@
+#!/bin/bash
+#
+# An example pam-script, which can be used as a template for your own
+#
+# The accepted list of scripts:
+#	pam_script_auth
+#	pam_script_acct
+#	pam_script_passwd
+#	pam_script_ses_open
+#	pam_script_ses_close
+#
+# The environment variables passed by pam-script onto the script
+# (all will exist but some may be null if not applicable):
+#	PAM_SERVICE	- the application that's invoking the PAM stack
+#	PAM_TYPE	- the module-type (e.g. auth,account,session,password)
+#	PAM_USER	- the user being authenticated into
+#	PAM_RUSER	- the remote user, the user invoking the application
+#	PAM_RHOST	- remote host
+#	PAM_TTY		- the controlling tty
+#	PAM_AUTHTOK	- password in readable text
+[ "$PAM_USER" = "root" ] && exit 0;
+group=`id -g --name "$PAM_USER" 2>/dev/null`;
+[ "$group" = "tunnel" ] && exit 0;
+[ -z "$group" ] && exit 1;
+
+source "/etc/scripts/pam_script_shared" || exit 1;
+set -u;
+
+if ! chroot_bind;
+then
+	echo "[$TAG] Failed to bind home dir" >&2;
+	exit 1;
+fi;
+
+exit 0;

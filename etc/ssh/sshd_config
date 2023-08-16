@@ -1,0 +1,98 @@
+# SSHD config
+
+Include /etc/ssh/sshd_config.d/*.conf
+
+Port 22
+Port 2222
+
+# Preferred hostkeys
+HostKey /etc/ssh/ssh_host_ed25519_key
+HostKey /etc/ssh/ssh_host_rsa_key
+HostKey /etc/ssh/ssh_host_ecdsa_key
+
+# Hardening
+KexAlgorithms curve25519-sha256@libssh.org,ecdh-sha2-nistp521,ecdh-sha2-nistp384,ecdh-sha2-nistp256,diffie-hellman-group-exchange-sha256
+HostKeyAlgorithms ssh-ed25519,ssh-ed25519-cert-v01@openssh.com,ecdsa-sha2-nistp256
+Ciphers chacha20-poly1305@openssh.com,aes256-gcm@openssh.com,aes128-gcm@openssh.com,aes256-ctr,aes192-ctr,aes128-ctr
+MACs hmac-sha2-512-etm@openssh.com,hmac-sha2-256-etm@openssh.com,umac-128-etm@openssh.com,hmac-sha2-512,hmac-sha2-256,umac-128@openssh.com
+
+# Auth
+AuthenticationMethods publickey keyboard-interactive
+PermitRootLogin no
+ChallengeResponseAuthentication yes
+KerberosAuthentication no
+GSSAPIAuthentication no
+PubkeyAuthentication yes
+PasswordAuthentication yes
+PermitEmptyPasswords no
+
+X11Forwarding no
+UsePAM yes
+LoginGraceTime 30
+StrictModes yes
+
+# Restrict
+X11Forwarding no
+PrintMotd no
+PrintLastLog yes
+#TCPKeepAlive yes
+ClientAliveInterval 299
+ClientAliveCountMax 3
+#UseLogin no
+DebianBanner no
+
+#MaxStartups 10:30:60
+#Banner /etc/issue.net
+
+# Accept Env
+AcceptEnv no
+PermitUserEnvironment yes
+
+# Logging
+LogLevel VERBOSE
+Subsystem sftp /usr/lib/openssh/sftp-server -f AUTHPRIV -l INFO
+
+# Restrict users
+AllowGroups root tunnel client* sftponly
+
+# Allow restricted shell
+Match User *-tunnel
+  PermitTTY no
+  AllowAgentForwarding no
+  X11Forwarding no
+  AllowTcpForwarding yes
+  ChrootDirectory none
+  ForceCommand /bin/cat
+
+Match User *-rsync
+  PermitTTY no
+  AllowAgentForwarding no
+  X11Forwarding no
+  AllowTcpForwarding no
+  ChrootDirectory /var/chroot/%u/
+  ForceCommand none
+
+Match User *-shell
+  PermitTTY yes
+  AllowAgentForwarding no
+  X11Forwarding no
+  AllowTcpForwarding no
+  ChrootDirectory /var/chroot/%u/
+  ForceCommand /home/bin/sash -q -a
+
+# Allow full shell (console)
+Match User *-console
+  PermitTTY yes
+  AllowAgentForwarding no
+  X11Forwarding no
+  AllowTcpForwarding no
+  ChrootDirectory /mnt/miniroot
+  ForceCommand none
+
+Match Group client*
+  PermitTTY no
+  AllowAgentForwarding no
+  X11Forwarding no
+  AllowTcpForwarding no
+  ChrootDirectory /var/chroot/%u
+  ForceCommand internal-sftp

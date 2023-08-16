@@ -1,0 +1,5 @@
+#!/bin/busybox sh
+
+echo "Tunnel is UP - do not close !";
+exec cat >/dev/null
+exit 0

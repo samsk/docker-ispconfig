@@ -295,6 +295,7 @@ if($conf['mysql']['master_slave_setup'] == 'y') {
 			$finished = true;
 		} else {
 			swriteln($inst->lng('Unable to connect to mysql server').' '.mysqli_connect_error());
+			sleep(1);
 		}
 	} while ($finished == false);
 	unset($finished);

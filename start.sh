@@ -6,6 +6,7 @@ do
    [ -e "$i" ] && bash "$i";
 done;
 
+set -a;
 source /etc/environment.ispconfig || exit 1
 
 echo $(grep $(hostname) /etc/hosts | cut -f1) localhost >> /etc/hosts
@@ -14,12 +15,15 @@ envsubst < /root/autoinstall.ini > /root/ispconfig3_install/install/autoinstall.
 
 echo $isp_hostname > /etc/mailname
 
+# additional start scripts
+[ -d /etc/start.d ] && run-parts --regex ".*\.sh" /etc/start.d
+
 cd /root/ispconfig3_install/install/
 
 if [ -f /usr/local/ispconfig/interface/lib/config.inc.php ]; 
 then
-  # Fixed: Table already exists
-  rm /root/ispconfig3_install/install/sql/incremental/upd_dev_collection.sql
+        # Fixed: Table already exists
+        rm /root/ispconfig3_install/install/sql/incremental/upd_dev_collection.sql
 	/wait-for-it.sh $isp_mysql_hostname:$isp_mysql_port -- php -q update.php --autoinstall=/root/ispconfig3_install/install/autoinstall.ini
 else
 	/wait-for-it.sh $isp_mysql_hostname:$isp_mysql_port -- php -q install.php --autoinstall=/root/ispconfig3_install/install/autoinstall.ini
@@ -100,4 +104,4 @@ fi
 
 systemctl start pure-ftpd
 
-#exec /usr/bin/supervisord -c /etc/supervisor/supervisord.conf
+exit 0;

@@ -1,0 +1,1 @@
+%sshusers   ALL=(ALL) NOPASSWD:SETENV: /etc/scripts/chroot_helper

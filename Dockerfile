@@ -44,7 +44,7 @@ RUN apt-get -y update && \
    apt-get -y upgrade && \
    apt-get -y install quota quotatool software-properties-common quota mysql-client wget \
      curl vim rsyslog rsyslog-relp logrotate automysqlbackup screenfetch apt-utils gettext-base git \
-     systemd supervisor && \
+     systemd supervisor libpam-script libpam-abl iputils-ping && \
    add-apt-repository ppa:ondrej/php && \
    apt-get -y update && \
    apt-get -y upgrade && \
@@ -76,7 +76,6 @@ RUN touch /usr/share/man/man5/maildir.maildrop.5.gz \
 RUN apt-get -y install postfix mysql-client postfix-mysql postfix-doc openssl getmail6 rkhunter binutils courier-authlib-mysql courier-pop courier-pop courier-imap courier-imap libsasl2-2 libsasl2-modules libsasl2-modules-sql sasl2-bin libpam-mysql sudo gamin && \
       service postfix stop
 ADD ./etc/postfix/master.cf /etc/postfix/master.cf
-ADD ./etc/security/limits.conf /etc/security/limits.conf
 ADD ./etc/courier/authmysqlrc.ini /root/authmysqlrc.ini
 
 # Install Amavisd-new, SpamAssassin And Clamav
@@ -105,7 +104,7 @@ ADD ./etc/fail2ban/filter.d/pureftpd.conf /etc/fail2ban/filter.d/pureftpd.conf
 ADD ./etc/fail2ban/filter.d/postfix-sasl.conf /etc/fail2ban/filter.d/postfix-sasl.conf
 
 # Install Apache2, PHP, FCGI, suExec, Pear, And mcrypt
-RUN apt-get -y install apache2 apache2-doc apache2-utils libapache2-mod-php \
+RUN apt-get -y install apache2 apache2-doc apache2-utils libapache2-mod-php incron \
         libapache2-mod-fcgid apache2-suexec-pristine memcached \
         mcrypt imagemagick libruby \
         libapache2-mod-php7.4 libapache2-mod-php8.2 \
@@ -133,14 +132,21 @@ ADD ./wait-for-it.sh /wait-for-it.sh
 ADD ./autoinstall.ini /root/autoinstall.ini
 ADD ./start.sh /start.sh
 #ADD ./supervisord.conf /etc/supervisor/supervisord.conf
+ADD ./etc/ssh /etc/ssh
 ADD ./etc/rsyslog/rsyslog.conf /etc/rsyslog.conf
 ADD ./etc/cron.daily/sql_backup.sh /etc/cron.daily/sql_backup.sh
 ADD ./etc/systemd /etc/systemd
+ADD ./etc/pam.d /etc/pam.d
+ADD ./etc/security /etc/security
+ADD ./etc/scripts /etc/scripts
+ADD ./etc/sudoers.d /etc/sudoers.d
+
+RUN for i in pam_script_acct pam_script_ses_close pam_script_ses_open pam_script_auth; \
+       do ln -svf /etc/scripts/$i /usr/share/libpam-script/;done
 RUN systemctl enable ispconfig-start.service
 
 ADD ./etc/postfix/master.cf /etc/postfix/master.cf
 ADD ./etc/clamav/clamd.conf /etc/clamav/clamd.conf
-
 
 # Install ISPConfig 3
 RUN git clone --branch $TAG_SYN --depth 1 https://github.com/AVENTER-UG/ispconfig3.git /root/ispconfig3_install
@@ -152,9 +158,12 @@ EXPOSE 53 80/tcp 443/tcp 953/tcp 8080/tcp 30000 30001 30002 30003 30004 30005 30
 #ADD ./bin/systemctl /bin/systemctl
 RUN chmod 755 /start.sh && \
       mkdir -p /var/run/sshd \
+         /var/log/.abl \
          /var/log/supervisor \
          /var/backup/sql \
-         /var/spool/postfix/private && \
+         /var/spool/postfix/private \
+         /var/lib/php-fpm \
+         /home/chroot && \
       touch /var/spool/postfix/private/quota-status && \
       chown postfix:root /var/spool/postfix/private && \
       chown postfix:postfix /var/spool/postfix/private/quota-status && \

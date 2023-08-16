@@ -1,0 +1,14 @@
+#!/bin/bash
+source "/etc/scripts/pam_script_shared" || exit 1;
+set -u;
+
+case "$1" in
+	"bind-home" )
+		chroot_mount && exit 0;
+		exit 1;
+		;;
+	* )
+		echo "usage: $0 <command>" >&2;
+		exit 1;
+		;;
+esac;
