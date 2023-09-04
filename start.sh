@@ -57,38 +57,29 @@ rm -rf /var/run/saslauthd
 ln -sfn /var/spool/postfix/var/run/saslauthd /var/run/saslauthd
 
 screenfetch
-#if [ "$isp_enable_mail" == "y" ];
-#then
-#  /etc/init.d/clamav-daemon start
-#fi
-#
-#if [ "$isp_enable_mail" == "y" ];
-#then
-#  /etc/init.d/courier-authdaemon start
-#fi
-#
-#if [ "$isp_enable_dns" == "y" ];
-#then
-#  /etc/init.d/named start
-#fi
-#
-#if [ "$isp_enable_nginx" == "y" ];
-#then
-#  /etc/init.d/php${isp_php_version}-fpm start
-#fi
-#
-#if [ "$isp_enable_apache" == "y" ];
-#then
-#  /etc/init.d/php${isp_php_version}-fpm start
-#fi
-#
-#/etc/init.d/cron restart
 
-unset isp_mysql_root_password
-unset isp_mysql_ispconfig_password
-unset isp_mysql_master_root_password
-unset isp_admin_password
-unset isp_mysql_database
+function configure_service() {
+   local enable=shift;
+
+   for i in "$@";
+   do
+      if [ "$enable" != "${enable~~y}"];
+      then
+           systemctl enable "$i";
+           systemctl start "$i";
+      else
+           systemctl disable "$i";
+           systemctl stop "$i";
+      fi;
+   done;
+}
+
+configure_service "$isp_enable_mail" clamav-daemon.service amavis.service clamav-freshclam.service \
+   courier-authdaemon.service courier-imap-ssl.service courier-imap.service courier-pop-ssl.service courier-pop.service \
+
+configure_service "$isp_enable_dns" named
+
+configure_service "$isp_enable_apache$isp_enable_nginx" apache nginx php${isp_php_version}-fpm
 
 # fix rncd erro
 chown root:bind /etc/bind/rndc.key

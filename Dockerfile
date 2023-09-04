@@ -2,7 +2,6 @@ FROM ubuntu:jammy
 
 MAINTAINER Andreas Peters <support@aventer.biz> version: 0.2
 
-ARG TAG_SYN=master
 
 ENV isp_mysql_hostname localhost
 ENV isp_mysql_port 3306
@@ -38,18 +37,20 @@ ENV isp_change_firewall_server y
 ENV isp_change_vserver_server y
 ENV isp_change_db_server y
 ENV isp_php_version 7.4
+ENV isp_php_versions_available 7.4 8.1 8.2 8.3
 
 ENV DEBIAN_FRONTEND noninteractive
 RUN apt-get -y update && \
    apt-get -y upgrade && \
+   apt-get -y remove openbsd-inetd update-inetd tcpd && \
    apt-get -y install quota quotatool software-properties-common quota mysql-client wget \
      curl vim rsyslog rsyslog-relp logrotate automysqlbackup screenfetch apt-utils gettext-base git \
-     systemd supervisor libpam-script libpam-abl iputils-ping && \
+     systemd supervisor libpam-script libpam-abl iputils-ping xinetd rinetd netcat \
+     ssh openssh-server rsync openssh-sftp-server gesftpserver etckeeper && \
    add-apt-repository ppa:ondrej/php && \
    apt-get -y update && \
    apt-get -y upgrade && \
-   apt-get -y autoremove && \
-   apt-get -y install ssh openssh-server rsync openssh-sftp-server gesftpserver etckeeper
+   apt-get -y autoremove
 
 # Install Postfix, Dovecot, rkhunter, binutils
 RUN apt-get install -y courier-authdaemon courier-authlib courier-authlib-userdb
@@ -106,13 +107,17 @@ ADD ./etc/fail2ban/filter.d/postfix-sasl.conf /etc/fail2ban/filter.d/postfix-sas
 # Install Apache2, PHP, FCGI, suExec, Pear, And mcrypt
 RUN apt-get -y install apache2 apache2-doc apache2-utils libapache2-mod-php incron \
         libapache2-mod-fcgid apache2-suexec-pristine memcached \
-        mcrypt imagemagick libruby \
-        libapache2-mod-php7.4 libapache2-mod-php8.2 \
-        php7.4 php7.4-common php7.4-gd php7.4-mysql php7.4-imap php7.4-cli php7.4-cgi php7.4-opcache php7.4-soap \
-          php7.4-fpm php7.4-curl php7.4-intl php7.4-pspell php7.4-sqlite3 php7.4-tidy php7.4-xmlrpc php7.4-xsl php7.4-zip php7.4-mbstring \
-        php8.2 php8.2-common php8.2-gd php8.2-mysql php8.2-imap php8.2-cli php8.2-cgi php8.2-opcache php8.2-soap \
-          php8.2-fpm php8.2-curl php8.2-intl php8.2-pspell php8.2-sqlite3 php8.2-tidy php8.2-xmlrpc php8.2-xsl php8.2-zip php8.2-mbstring \
-        php-memcache php-imagick php-apcu php-soap php-pear
+        mcrypt imagemagick libruby ;\
+        for ver in $isp_php_versions_available; \
+        do \
+           apt-get install -y --ignore-missing libapache2-mod-php8.3 \
+                     php${ver} php${ver}-common php${ver}-gd php${ver}-mysql php${ver}-imap php${ver}-cli \
+                     php${ver}-cgi php${ver}-opcache php${ver}-bcmath php${ver}-soap \
+                     php${ver}-fpm php${ver}-curl php${ver}-intl php${ver}-pspell php${ver}-sqlite3 \
+                     php${ver}-xsl php${ver}-zip php${ver}-mbstring; \
+        done; \
+        apt-get install -y php-mcrypt php-xmlrpc php-uuid php-yaml php-memcache php-imagick \
+          php-apcu php-soap php-pear php-json
 
 ADD ./etc/apache2/conf-available/httpoxy.conf /etc/apache2/conf-available/httpoxy.conf
 RUN echo "ServerName localhost" > /etc/apache2/conf-available/servername.conf && \
@@ -131,7 +136,6 @@ RUN apt-get -y install python3-certbot-apache
 ADD ./wait-for-it.sh /wait-for-it.sh
 ADD ./autoinstall.ini /root/autoinstall.ini
 ADD ./start.sh /start.sh
-#ADD ./supervisord.conf /etc/supervisor/supervisord.conf
 ADD ./etc/ssh /etc/ssh
 ADD ./etc/rsyslog/rsyslog.conf /etc/rsyslog.conf
 ADD ./etc/cron.daily/sql_backup.sh /etc/cron.daily/sql_backup.sh
@@ -149,9 +153,13 @@ ADD ./etc/postfix/master.cf /etc/postfix/master.cf
 ADD ./etc/clamav/clamd.conf /etc/clamav/clamd.conf
 
 # Install ISPConfig 3
-RUN git clone --branch $TAG_SYN --depth 1 https://github.com/AVENTER-UG/ispconfig3.git /root/ispconfig3_install
+ARG ISPCONFIG_TAG=3.2.11
+
+RUN git clone --branch $ISPCONFIG_TAG --depth 1 https://git.ispconfig.org/ispconfig/ispconfig3.git /root/ispconfig3_install
 ADD ./update.php /root/ispconfig3_install/install/update.php
 ADD ./install.php /root/ispconfig3_install/install/install.php
+
+RUN grep -R ISPC_APP_VERSION /root/ispconfig3_install
 
 EXPOSE 53 80/tcp 443/tcp 953/tcp 8080/tcp 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009 $isp_mysql_port
 
