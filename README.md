@@ -7,6 +7,11 @@
 
 This docker image include a whole ISPConfig3 software stack. For details, I'm sorry have a look in the Dockerfile. Later I will write down all installed packages.
 
+## Funding
+
+[![](https://www.paypalobjects.com/en_US/i/btn/btn_donateCC_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=H553XE4QJ9GJ8)
+
+
 ## How to use it
 
 First, have a look at the following docker-compose file to get an idea.
@@ -28,7 +33,7 @@ services:
       MYSQL_ROOT_PASSWORD: <PASSWORD>
 
   server1:
-image: avhost/docker-ispconfig:latest
+    image: avhost/docker-ispconfig:latest
     ports:
       - "443:443"
       - "80:80"
@@ -42,8 +47,10 @@ image: avhost/docker-ispconfig:latest
     cap_add:
       - NET_ADMIN
       - NET_RAW
+      - SYS_ADMIN
     environment:
       isp_mysql_hostname: "master.weave.local"
+      isp_mysql_port: "3306"
       isp_mysql_root_password: "<PASSWORD>"
       isp_mysql_ispconfig_password: "<PASSWORD>"
       isp_admin_password: "<PASSWORD>"
@@ -60,6 +67,7 @@ image: avhost/docker-ispconfig:latest
       isp_enable_multiserver: "n"
       isp_hostname: "<$HOSTNAME>"
       isp_use_ssl: "y"
+      isp_php_version: "7.4"
       isp_phpmyadmin_blowfish_secret: "advpDZ9wHZXkZSfV78DLRjzSPaTm5yBC"
       isp_change_mail_server: "y"
       isp_change_web_server: "y"
@@ -100,8 +108,15 @@ Yes its working! We are using it with weave.works and docker-compose. At the hos
 
 It's definitly not a microservice. :-) So, you cannot recreate the running container like you want and to everytime. You need a downtime, and maybe you also have so cleanup a little bit after you restart the container.
 
-# Sponsors
+## Fork notes (samsk)
 
-Thanks to my sponsor.
+This fork tracks [AVENTER-UG/docker-ispconfig](https://github.com/AVENTER-UG/docker-ispconfig) and keeps these extras:
 
-![FERB](https://avatars.githubusercontent.com/u/98983967?s=60&v=4)
+- **systemd** as PID 1 (`CMD /sbin/init`) instead of supervisord
+- **pure-ftpd** with packaged config under `etc/pure-ftpd`
+- **multi-PHP** via `isp_php_versions_available` (default `7.4 8.1 8.2 8.3`) and `isp_php_version`
+- **`isp_mysql_port`** for non-default MySQL ports
+- GitHub Actions workflow retained for image builds
+
+Sync upstream with: `git fetch upstream && git merge upstream/master`
+

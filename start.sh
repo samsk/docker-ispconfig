@@ -2,7 +2,7 @@
 
 # restore dir tree
 for i in /etc/dirtree/*.tree;
-do 
+do
    [ -e "$i" ] && bash "$i";
 done;
 
@@ -20,7 +20,7 @@ echo $isp_hostname > /etc/mailname
 
 cd /root/ispconfig3_install/install/
 
-if [ -f /usr/local/ispconfig/interface/lib/config.inc.php ]; 
+if [ -f /usr/local/ispconfig/interface/lib/config.inc.php ];
 then
         # Fixed: Table already exists
         rm /root/ispconfig3_install/install/sql/incremental/upd_dev_collection.sql
@@ -35,6 +35,8 @@ chown -R amavis: /var/lib/amavis/
 #sed -i "s/^hosts .*$/hosts = $isp_mysql_hostname/g" /etc/postfix/mysql-virtual_outgoing_bcc.cf
 sed -i "s/^myhostname = .*$/myhostname = $isp_hostname/g" /etc/postfix/main.cf
 echo message_size_limit=52428800 >> /etc/postfix/main.cf
+sed -i "s/^inet_protocols = .*$/inet_protocols = $isp_postfix_protocols/g" /etc/postfix/main.cf
+sed -i "s/, check_policy_service unix:private\/quota-status$//g" /etc/postfix/main.cf
 
 #echo "UPDATE mysql.user SET Host = '%' WHERE User like 'ispc%';" | mysql -u root -h$isp_mysql_hostname -p$isp_mysql_root_password
 #echo "UPDATE mysql.db SET Host = '%' WHERE User like 'ispc%';" | mysql -u root -h$isp_mysql_hostname -p$isp_mysql_root_password
@@ -58,41 +60,63 @@ ln -sfn /var/spool/postfix/var/run/saslauthd /var/run/saslauthd
 
 screenfetch
 
-function configure_service() {
-   local enable=shift;
+# Enable or disable a list of systemd units.
+# Args: enable_flag (y/n) followed by unit names.
+configure_service() {
+   local enable="$1"
+   shift
 
    for i in "$@";
    do
-      if [ "$enable" != "${enable~~y}"];
+      if [ "$enable" = "y" ];
       then
            systemctl enable "$i";
            systemctl start "$i";
       else
-           systemctl disable "$i";
-           systemctl stop "$i";
+           systemctl disable "$i" 2>/dev/null || true;
+           systemctl stop "$i" 2>/dev/null || true;
       fi;
    done;
 }
 
 configure_service "$isp_enable_mail" clamav-daemon.service amavis.service clamav-freshclam.service \
-   courier-authdaemon.service courier-imap-ssl.service courier-imap.service courier-pop-ssl.service courier-pop.service \
+   courier-authdaemon.service courier-imap-ssl.service courier-imap.service courier-pop-ssl.service courier-pop.service
 
 configure_service "$isp_enable_dns" named
 
-configure_service "$isp_enable_apache$isp_enable_nginx" apache nginx php${isp_php_version}-fpm
+configure_service "$isp_enable_apache" apache2
+configure_service "$isp_enable_nginx" nginx
+if [ "$isp_enable_apache" = "y" ] || [ "$isp_enable_nginx" = "y" ];
+then
+  systemctl enable "php${isp_php_version}-fpm"
+  systemctl start "php${isp_php_version}-fpm"
+fi
+
+if [ "$isp_enable_jailkit" = "y" ];
+then
+  systemctl start ssh
+fi
+
+systemctl restart cron
+systemctl start postgrey
+systemctl start pure-ftpd
 
 # fix rncd erro
 chown root:bind /etc/bind/rndc.key
 # fix index permission error
 chown courier: /etc/courier/shared/index
 
-if [ -f "/var/backup/1st-backup-complete.log" ]; 
-then 
-    echo "1st Backup file exists. Nothing to do here" 
-else 
+if [ -f "/var/backup/1st-backup-complete.log" ];
+then
+    echo "1st Backup file exists. Nothing to do here"
+else
     /do-1st-backup.sh &
 fi
 
-systemctl start pure-ftpd
+unset isp_mysql_root_password
+unset isp_mysql_ispconfig_password
+unset isp_mysql_master_root_password
+unset isp_admin_password
+unset isp_mysql_database
 
 exit 0;

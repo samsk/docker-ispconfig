@@ -1,49 +1,53 @@
 FROM ubuntu:jammy
 
-MAINTAINER Andreas Peters <support@aventer.biz> version: 0.2
+LABEL maintainer="Andreas Peters <support@aventer.biz>"
+LABEL org.opencontainers.image.title="docker-ispconfig"
+LABEL org.opencontainers.image.description="This docker image include a whole ISPConfig3 software stack!"
+LABEL org.opencontainers.image.vendor="AVENTER UG (haftungsbeschränkt)"
+LABEL org.opencontainers.image.source="https://github.com/AVENTER-UG/docker-ispconfig"
 
+ENV isp_mysql_hostname=localhost
+ENV isp_mysql_port=3306
+ENV isp_mysql_root_user=root
+ENV isp_mysql_root_password=default
+ENV isp_mysql_database=dbispconfig
+ENV isp_mysql_ispconfig_password=default
+ENV isp_mysql_master_root_user=root
+ENV isp_mysql_master_root_password=default
+ENV isp_mysql_master_hostname=localhost
+ENV isp_mysql_master_port=3306
+ENV isp_mysql_master_user=root
+ENV isp_mysql_master_database=dbispconfig
+ENV isp_admin_password=default
+ENV isp_enable_webserver=y
+ENV isp_enable_mail=n
+ENV isp_enable_jailkit=n
+ENV isp_enable_ftp=n
+ENV isp_enable_dns=y
+ENV isp_enable_apache=y
+ENV isp_enable_nginx=y
+ENV isp_enable_firewall=y
+ENV isp_enable_webinterface=y
+ENV isp_enable_multiserver=n
+ENV isp_hostname=localhost
+ENV isp_cert_hostname=localhost
+ENV isp_use_ssl=y
+ENV isp_change_mail_server=y
+ENV isp_change_web_server=y
+ENV isp_change_dns_server=y
+ENV isp_change_xmpp_server=y
+ENV isp_change_firewall_server=y
+ENV isp_change_vserver_server=y
+ENV isp_change_db_server=y
+ENV isp_postfix_protocols=ipv4
+ENV isp_php_version=7.4
+ENV isp_php_versions_available="7.4 8.1 8.2 8.3"
 
-ENV isp_mysql_hostname localhost
-ENV isp_mysql_port 3306
-ENV isp_mysql_root_user root
-ENV isp_mysql_root_password default
-ENV isp_mysql_database dbispconfig
-ENV isp_mysql_ispconfig_password default
-ENV isp_mysql_master_root_user root
-ENV isp_mysql_master_root_password default
-ENV isp_mysql_master_hostname localhost
-ENV isp_mysql_master_port 3306
-ENV isp_mysql_master_user root
-ENV isp_mysql_master_database dbispconfig
-ENV isp_admin_password default
-ENV isp_enable_webserver y
-ENV isp_enable_mail n
-ENV isp_enable_jailkit n
-ENV isp_enable_ftp n
-ENV isp_enable_dns y
-ENV isp_enable_apache y
-ENV isp_enable_nginx y
-ENV isp_enable_firewall y
-ENV isp_enable_webinterface y
-ENV isp_enable_multiserver n
-ENV isp_hostname localhost
-ENV isp_cert_hostname localhost
-ENV isp_use_ssl y
-ENV isp_change_mail_server y
-ENV isp_change_web_server y
-ENV isp_change_dns_server y
-ENV isp_change_xmpp_server y
-ENV isp_change_firewall_server y
-ENV isp_change_vserver_server y
-ENV isp_change_db_server y
-ENV isp_php_version 7.4
-ENV isp_php_versions_available 7.4 8.1 8.2 8.3
-
-ENV DEBIAN_FRONTEND noninteractive
+ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get -y update && \
    apt-get -y upgrade && \
    apt-get -y remove openbsd-inetd update-inetd tcpd && \
-   apt-get -y install quota quotatool software-properties-common quota mysql-client wget \
+   apt-get -y install software-properties-common mysql-client wget \
      curl vim rsyslog rsyslog-relp logrotate automysqlbackup screenfetch apt-utils gettext-base git \
      systemd supervisor libpam-script libpam-abl iputils-ping xinetd rinetd netcat \
      ssh openssh-server rsync openssh-sftp-server gesftpserver etckeeper && \
@@ -77,6 +81,7 @@ RUN touch /usr/share/man/man5/maildir.maildrop.5.gz \
 RUN apt-get -y install postfix mysql-client postfix-mysql postfix-doc openssl getmail6 rkhunter binutils courier-authlib-mysql courier-pop courier-pop courier-imap courier-imap libsasl2-2 libsasl2-modules libsasl2-modules-sql sasl2-bin libpam-mysql sudo gamin && \
       service postfix stop
 ADD ./etc/postfix/master.cf /etc/postfix/master.cf
+ADD ./etc/security/limits.conf /etc/security/limits.conf
 ADD ./etc/courier/authmysqlrc.ini /root/authmysqlrc.ini
 
 # Install Amavisd-new, SpamAssassin And Clamav
@@ -95,14 +100,16 @@ RUN apt-get -y install bind9 dnsutils haveged && \
 RUN apt-get -y install vlogger webalizer awstats geoip-database libclass-dbi-mysql-perl
 ADD etc/cron.d/awstats /etc/cron.d/
 
-# Install fail2ban
+# Install Jailkit
+RUN apt-get -y install build-essential autoconf automake libtool flex bison debhelper binutils python3 jailkit
+
+# Install fail2ban and pure-ftpd
 RUN apt-get -y install pure-ftpd fail2ban && \
       systemctl enable pure-ftpd
 ADD ./etc/ssl /etc/ssl
 ADD ./etc/pure-ftpd /etc/pure-ftpd
 ADD ./etc/fail2ban/jail.local /etc/fail2ban/jail.local
-ADD ./etc/fail2ban/filter.d/pureftpd.conf /etc/fail2ban/filter.d/pureftpd.conf
-ADD ./etc/fail2ban/filter.d/postfix-sasl.conf /etc/fail2ban/filter.d/postfix-sasl.conf
+ADD ./etc/fail2ban/filter.d/* /etc/fail2ban/filter.d/
 
 # Install Apache2, PHP, FCGI, suExec, Pear, And mcrypt
 RUN apt-get -y install apache2 apache2-doc apache2-utils libapache2-mod-php incron \
@@ -132,6 +139,9 @@ RUN echo "ServerName localhost" > /etc/apache2/conf-available/servername.conf &&
 # Install Let's Encrypt
 RUN apt-get -y install python3-certbot-apache
 
+# UFW firewall
+RUN apt-get -y install ufw
+
 # ISPCONFIG Initialization and Startup Script
 ADD ./wait-for-it.sh /wait-for-it.sh
 ADD ./autoinstall.ini /root/autoinstall.ini
@@ -150,10 +160,14 @@ RUN for i in pam_script_acct pam_script_ses_close pam_script_ses_open pam_script
 RUN systemctl enable ispconfig-start.service
 
 ADD ./etc/postfix/master.cf /etc/postfix/master.cf
+
+ADD ./etc/postfix/client_checks /etc/postfix/client_checks
+RUN postmap /etc/postfix/client_checks
+
 ADD ./etc/clamav/clamd.conf /etc/clamav/clamd.conf
 
 # Install ISPConfig 3
-ARG ISPCONFIG_TAG=3.2.11
+ARG ISPCONFIG_TAG=3.2.12p1
 
 RUN git clone --branch $ISPCONFIG_TAG --depth 1 https://git.ispconfig.org/ispconfig/ispconfig3.git /root/ispconfig3_install
 ADD ./update.php /root/ispconfig3_install/install/update.php
@@ -163,7 +177,6 @@ RUN grep -R ISPC_APP_VERSION /root/ispconfig3_install
 
 EXPOSE 53 80/tcp 443/tcp 953/tcp 8080/tcp 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009 $isp_mysql_port
 
-#ADD ./bin/systemctl /bin/systemctl
 RUN chmod 755 /start.sh && \
       mkdir -p /var/run/sshd \
          /var/log/.abl \
@@ -182,6 +195,7 @@ RUN chmod 755 /start.sh && \
       chmod 755 /var/log && \
       echo "export TERM=xterm" >> /root/.bashrc && \
       echo "column-statistics=0" >> /etc/mysql/conf.d/mysqldump.cnf && \
+      echo 'START="yes"' >> /etc/default/saslauthd && \
       etckeeper init && \
       rm -rf /sbin/init && \
       mkdir -p /var/www/sites /var/log/root && \
@@ -193,7 +207,10 @@ RUN mkdir -p /etc/dirtree && \
      find /var/log -type d -printf "mkdir -p %p; chown %U:%G %p; chmod %m %p;\n" >/etc/dirtree/var_log.tree;
 
 ## logrotate woradounds
-ADD ./etc/logrotate/rsyslog-rotate /usr/lib/rsyslog/rsyslog-rotate 
+ADD ./etc/logrotate/rsyslog-rotate /usr/lib/rsyslog/rsyslog-rotate
+
+## FIX: Postgrey listening interface
+ADD ./etc/default/postgrey /etc/default/postgrey
 
 VOLUME ["/etc"]
 VOLUME ["/usr/local/ispconfig"]

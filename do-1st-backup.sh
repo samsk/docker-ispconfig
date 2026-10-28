@@ -7,6 +7,10 @@ output=/var/backup/1st-backup-complete.log
 
 if [ ! -f "$output" ]
 then
+    if [ ! -f "/data_tmp" ]
+    then
+        mkdir /data_tmp/
+    fi
     echo "Waiting for 30 sec to ensure install is completed before doing the backup" 
     sleep 30 
     cp -r --parents /var/lib/amavis/ /data_tmp/
@@ -29,9 +33,15 @@ then
     echo "/var/vmail/ backed up 1st time" >>  $output
     cp -r --parents /var/www/ /data_tmp/
     echo "/var/www/ backed up 1st time" >>  $output
+    cp -r --parents /etc/pure-ftpd/ /data_tmp/
+    echo "/etc/pure-ftpd/ backed up 1st time" >>  $output
+    cp -r --parents /etc/default/postgrey /data_tmp/
+    echo "/etc/default/postgrey backed up 1st time" >>  $output
+    cp -r --parents /etc/systemd/ /data_tmp/
+    echo "/etc/systemd/ backed up 1st time" >>  $output
     dt=$(date '+%d/%m/%Y %H:%M:%S');
     echo "1st Backup Completed $dt" >>  $output
-    echo "1st Backup Completed $dt" 
+    echo "1st Backup Completed $dt"
 else
     echo "Backup log File found. No backup required, change to Persist Data"
 fi
