@@ -1,0 +1,4 @@
+
+# force certificate reload
+33 10 * * 2 root /usr/bin/systemctl reload apache2 2>/dev/null
+36 10 * * 2 root /usr/bin/systemctl reload nginx 2>/dev/null
