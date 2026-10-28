@@ -1,0 +1,54 @@
+services:
+  master:
+    image: mariadb:11
+    command: --max_allowed_packet=32505856
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: testroot
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - ispnet
+
+  server1:
+    build: .
+    image: samsk/docker-ispconfig:local
+    hostname: server1.local
+    depends_on:
+      master:
+        condition: service_healthy
+    privileged: true
+    cgroup: host
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:rw
+    ports:
+      - "18080:8080"
+      - "18000:80"
+    environment:
+      isp_mysql_hostname: master
+      isp_mysql_port: "3306"
+      isp_mysql_root_password: testroot
+      isp_mysql_ispconfig_password: testisp
+      isp_admin_password: admin
+      isp_mysql_master_root_password: testroot
+      isp_mysql_master_hostname: master
+      isp_enable_mail: "n"
+      isp_enable_jailkit: "n"
+      isp_enable_ftp: "y"
+      isp_enable_dns: "n"
+      isp_enable_apache: "y"
+      isp_enable_nginx: "n"
+      isp_enable_firewall: "n"
+      isp_enable_webinterface: "y"
+      isp_enable_multiserver: "n"
+      isp_hostname: server1.local
+      isp_use_ssl: "n"
+      isp_php_version: "7.4"
+    networks:
+      - ispnet
+
+networks:
+  ispnet:

@@ -169,7 +169,7 @@ ADD ./etc/clamav/clamd.conf /etc/clamav/clamd.conf
 # Install ISPConfig 3
 ARG ISPCONFIG_TAG=3.2.12p1
 
-RUN git clone --branch $ISPCONFIG_TAG --depth 1 https://git.ispconfig.org/ispconfig/ispconfig3.git /root/ispconfig3_install
+RUN git clone --branch $ISPCONFIG_TAG --depth 1 https://github.com/AVENTER-UG/ispconfig3.git /root/ispconfig3_install
 ADD ./update.php /root/ispconfig3_install/install/update.php
 ADD ./install.php /root/ispconfig3_install/install/install.php
 
@@ -196,7 +196,7 @@ RUN chmod 755 /start.sh && \
       echo "export TERM=xterm" >> /root/.bashrc && \
       echo "column-statistics=0" >> /etc/mysql/conf.d/mysqldump.cnf && \
       echo 'START="yes"' >> /etc/default/saslauthd && \
-      etckeeper init && \
+      (etckeeper init || true) && \
       rm -rf /sbin/init && \
       mkdir -p /var/www/sites /var/log/root && \
       chmod 0700 /var/log/root && \
