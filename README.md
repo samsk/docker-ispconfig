@@ -113,6 +113,7 @@ It's definitly not a microservice. :-) So, you cannot recreate the running conta
 
 This fork tracks [AVENTER-UG/docker-ispconfig](https://github.com/AVENTER-UG/docker-ispconfig) and keeps these extras:
 
+- **ISPConfig 3.3.2p1** from the official tarball (autoupdates on restart via `update.php` when `/usr/local/ispconfig` exists)
 - **Ubuntu 24.04 (Noble)** base image
 - **systemd** as PID 1 (`CMD /sbin/init`) instead of supervisord
 - **pure-ftpd** with packaged config under `etc/pure-ftpd`
@@ -122,6 +123,8 @@ This fork tracks [AVENTER-UG/docker-ispconfig](https://github.com/AVENTER-UG/doc
 - **`isp_mysql_port`** for non-default MySQL ports
 - Filesystem **quota/quotatool** packages installed (host mount must support quotas)
 - GitHub Actions workflow retained for image builds
+
+Backup MariaDB and `/usr/local/ispconfig` before swapping images (first boot runs the ISPConfig updater).
 
 Sync upstream with: `git fetch upstream && git merge upstream/master`
 

@@ -1,7 +1,8 @@
 #Dockerfile vars
 
 #vars
-TAG=v3.2.12-2
+TAG=v3.3.2p1-1
+ISPCONFIG_TAG=3.3.2p1
 IMAGENAME=docker-ispconfig
 IMAGEFULLNAME=avhost/${IMAGENAME}
 BRANCH=${TAG}
@@ -21,14 +22,14 @@ help:
 
 build:
 	@echo ">>>> Build docker image: " ${BRANCH}
-	@docker buildx build --progress=plain --load --build-arg ISPCONFIG_TAG=3.2.12p1 --build-arg BUILDDATE=${BUILDDATE} -t ${IMAGEFULLNAME}:${BRANCH} .
+	@docker buildx build --progress=plain --load --build-arg ISPCONFIG_TAG=${ISPCONFIG_TAG} --build-arg BUILDDATE=${BUILDDATE} -t ${IMAGEFULLNAME}:${BRANCH} .
 
 push:
 	@echo ">>>> Publish docker image: " ${TAG}_${BUILDDATE}
 	-docker buildx create --use --name buildkit
-	@docker buildx build --push --sbom=true --provenance=true --no-cache=true --build-arg ISPCONFIG_TAG=3.2.12p1 --build-arg BUILDDATE=${BUILDDATE} -t ${IMAGEFULLNAME}:${TAG}_${BUILDDATE} .
-	@docker buildx build --push --sbom=true --provenance=true --no-cache=true --build-arg ISPCONFIG_TAG=3.2.12p1 --build-arg BUILDDATE=${BUILDDATE} -t ${IMAGEFULLNAME}:${TAG} .
-	@docker buildx build --push --sbom=true --provenance=true --no-cache=true --build-arg ISPCONFIG_TAG=3.2.12p1 --build-arg BUILDDATE=${BUILDDATE} -t ${IMAGEFULLNAME}:${BRANCH} .
+	@docker buildx build --push --sbom=true --provenance=true --no-cache=true --build-arg ISPCONFIG_TAG=${ISPCONFIG_TAG} --build-arg BUILDDATE=${BUILDDATE} -t ${IMAGEFULLNAME}:${TAG}_${BUILDDATE} .
+	@docker buildx build --push --sbom=true --provenance=true --no-cache=true --build-arg ISPCONFIG_TAG=${ISPCONFIG_TAG} --build-arg BUILDDATE=${BUILDDATE} -t ${IMAGEFULLNAME}:${TAG} .
+	@docker buildx build --push --sbom=true --provenance=true --no-cache=true --build-arg ISPCONFIG_TAG=${ISPCONFIG_TAG} --build-arg BUILDDATE=${BUILDDATE} -t ${IMAGEFULLNAME}:${BRANCH} .
 	-docker buildx rm buildkit
 
 seccheck:

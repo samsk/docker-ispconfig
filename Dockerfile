@@ -34,15 +34,16 @@ ENV isp_redis_port=6379
 ENV isp_hostname=localhost
 ENV isp_cert_hostname=localhost
 ENV isp_use_ssl=y
-ENV isp_change_mail_server=y
-ENV isp_change_web_server=y
-ENV isp_change_dns_server=y
-ENV isp_change_xmpp_server=y
-ENV isp_change_firewall_server=y
-ENV isp_change_vserver_server=y
-ENV isp_change_db_server=y
+# yes/no required by update.php simple_query (y loops forever)
+ENV isp_change_mail_server=yes
+ENV isp_change_web_server=yes
+ENV isp_change_dns_server=yes
+ENV isp_change_xmpp_server=yes
+ENV isp_change_firewall_server=yes
+ENV isp_change_vserver_server=yes
+ENV isp_change_db_server=yes
 ENV isp_postfix_protocols=ipv4
-ENV isp_php_version=7.4
+ENV isp_php_version=8.3
 ENV isp_php_versions_available="7.4 8.1 8.2 8.3 8.4 8.5"
 
 ENV DEBIAN_FRONTEND=noninteractive
@@ -124,7 +125,7 @@ RUN echo "ServerName localhost" > /etc/apache2/conf-available/servername.conf &&
       a2enmod suexec rewrite ssl actions include dav_fs dav auth_digest cgi headers && \
       a2enconf httpoxy && \
       a2dissite 000-default && \
-      update-alternatives --set php /usr/bin/php7.4 && \
+      update-alternatives --set php /usr/bin/php8.3 && \
       a2enmod actions proxy_fcgi alias && \
       service apache2 stop
 
@@ -164,17 +165,24 @@ RUN postmap /etc/postfix/client_checks
 
 ADD ./etc/clamav/clamd.conf /etc/clamav/clamd.conf
 
-# Install ISPConfig 3
-ARG ISPCONFIG_TAG=3.2.12p1
+# Install ISPConfig 3 (official tarball; AVENTER git mirror has no 3.3 tags)
+ARG ISPCONFIG_TAG=3.3.2p1
+ARG ISPCONFIG_SHA256=b3a2111e997df8e1472933788c2809f038498e97bc00fbd285e18a84a47d4a93
 
-RUN git clone --branch $ISPCONFIG_TAG --depth 1 https://github.com/AVENTER-UG/ispconfig3.git /root/ispconfig3_install
+RUN wget -q -O /tmp/ispconfig.tar.gz \
+      "https://www.ispconfig.org/downloads/ISPConfig-${ISPCONFIG_TAG}.tar.gz" && \
+    echo "${ISPCONFIG_SHA256}  /tmp/ispconfig.tar.gz" | sha256sum -c - && \
+    tar xzf /tmp/ispconfig.tar.gz -C /root && \
+    rm -f /tmp/ispconfig.tar.gz
 # Containers lack CAP_LINUX_IMMUTABLE; skip chattr hardening
 RUN python3 -c 'from pathlib import Path; p=Path("/root/ispconfig3_install/install/lib/installer_base.lib.php"); s=p.read_text(); marker="\tpublic function set_immutable($path, $enable = true) {\n"; assert s.count(marker) == 1, "set_immutable marker changed"; p.write_text(s.replace(marker, marker + "\t\tif(is_file(\"/.dockerenv\")) return;\n", 1))'
+# Remote MariaDB + skip_name_resolve: grant ispconfig@'%' not @hostname
+RUN python3 -c 'from pathlib import Path; p=Path("/root/ispconfig3_install/install/lib/installer_base.lib.php"); s=p.read_text(); old="\t\t} else {\n\t\t\t$from_host = $conf['\''hostname'\''];\n\t\t}"; new="\t\t} else {\n\t\t\t$from_host = is_file('\''/.dockerenv'\'') ? '\''%'\'' : $conf['\''hostname'\''];\n\t\t}"; assert s.count(old) >= 1, "from_host hostname branch not found"; p.write_text(s.replace(old, new, 1))'
+# Empty VOLUME /usr/local/ispconfig is a dir; allow first-boot install.php
+RUN python3 -c 'from pathlib import Path; p=Path("/root/ispconfig3_install/install/install.php"); s=p.read_text(); old="if(is_dir('\''/usr/local/ispconfig'\'')) {\n\tdie('\''ISPConfig 3 installation found. Please use update.php instead if install.php to update the installation.'\'');\n}"; assert old in s, "already-installed guard not found"; p.write_text(s.replace(old, "if(is_dir('\''/usr/local/ispconfig'\'') && is_file('\''/usr/local/ispconfig/interface/lib/config.inc.php'\'')) {\n\tdie('\''ISPConfig 3 installation found. Please use update.php instead of install.php to update the installation.'\'');\n}", 1))'
 RUN install -m 0755 /root/ispconfig3_install/server/scripts/vlogger /usr/sbin/vlogger
-ADD ./update.php /root/ispconfig3_install/install/update.php
-ADD ./install.php /root/ispconfig3_install/install/install.php
 
-RUN grep -R ISPC_APP_VERSION /root/ispconfig3_install
+RUN grep -R ISPC_APP_VERSION /root/ispconfig3_install | head -20
 
 EXPOSE 53 80/tcp 443/tcp 953/tcp 8080/tcp 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009 $isp_mysql_port $isp_redis_port
 

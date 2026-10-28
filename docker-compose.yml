@@ -46,7 +46,7 @@ services:
       isp_enable_multiserver: "n"
       isp_hostname: server1.local
       isp_use_ssl: "n"
-      isp_php_version: "7.4"
+      isp_php_version: "8.3"
       isp_enable_redis: "n"
     networks:
       - ispnet

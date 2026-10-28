@@ -9,6 +9,16 @@ done;
 set -a;
 source /etc/environment.ispconfig || exit 1
 
+# update.php svc_detect_change_* expects yes/no (y/n busy-loops)
+for v in isp_change_mail_server isp_change_web_server isp_change_dns_server \
+         isp_change_xmpp_server isp_change_firewall_server isp_change_vserver_server \
+         isp_change_db_server; do
+  case "${!v}" in
+    y|Y) printf -v "$v" '%s' yes ;;
+    n|N) printf -v "$v" '%s' no ;;
+  esac
+done
+
 echo $(grep $(hostname) /etc/hosts | cut -f1) localhost >> /etc/hosts
 
 envsubst < /root/autoinstall.ini > /root/ispconfig3_install/install/autoinstall.ini
@@ -20,13 +30,33 @@ echo $isp_hostname > /etc/mailname
 
 cd /root/ispconfig3_install/install/
 
-if [ -f /usr/local/ispconfig/interface/lib/config.inc.php ];
-then
-        # Fixed: Table already exists
-        rm /root/ispconfig3_install/install/sql/incremental/upd_dev_collection.sql
-	/wait-for-it.sh $isp_mysql_hostname:$isp_mysql_port -- php -q update.php --autoinstall=/root/ispconfig3_install/install/autoinstall.ini
+# ISPConfig CLI uses PHP 8.3+ (sites may still use isp_php_version)
+ISP_PHP_CLI="${ISP_PHP_CLI:-php8.3}"
+command -v "$ISP_PHP_CLI" >/dev/null || ISP_PHP_CLI=php
+
+# skip_name_resolve: hostname grants never match docker client IPs
+ensure_ispconfig_db_host() {
+  local dbpass="${isp_mysql_ispconfig_password}"
+  if [ -f /usr/local/ispconfig/interface/lib/config.inc.php ]; then
+    dbpass="$("$ISP_PHP_CLI" -r 'include "/usr/local/ispconfig/interface/lib/config.inc.php"; echo $conf["db_password"];')"
+  fi
+  mysql -u root -h"$isp_mysql_hostname" -P"$isp_mysql_port" -p"$isp_mysql_root_password" <<EOF
+CREATE USER IF NOT EXISTS 'ispconfig'@'%' IDENTIFIED BY '${dbpass}';
+ALTER USER 'ispconfig'@'%' IDENTIFIED BY '${dbpass}';
+GRANT SELECT, INSERT, UPDATE, DELETE ON \`${isp_mysql_master_database}\`.* TO 'ispconfig'@'%';
+FLUSH PRIVILEGES;
+EOF
+}
+
+/wait-for-it.sh "$isp_mysql_hostname:$isp_mysql_port" -- true
+# Upgrade path: existing ispconfig@hostname must become @'%' before update.php
+if [ -f /usr/local/ispconfig/interface/lib/config.inc.php ]; then
+  ensure_ispconfig_db_host || true
+  rm -f /root/ispconfig3_install/install/sql/incremental/upd_dev_collection.sql
+  "$ISP_PHP_CLI" -q update.php --autoinstall=/root/ispconfig3_install/install/autoinstall.ini
 else
-	/wait-for-it.sh $isp_mysql_hostname:$isp_mysql_port -- php -q install.php --autoinstall=/root/ispconfig3_install/install/autoinstall.ini
+  "$ISP_PHP_CLI" -q install.php --autoinstall=/root/ispconfig3_install/install/autoinstall.ini
+  ensure_ispconfig_db_host || true
 fi
 
 # Fix from amavis ownerchip that prevents amavis to start
@@ -38,13 +68,13 @@ echo message_size_limit=52428800 >> /etc/postfix/main.cf
 sed -i "s/^inet_protocols = .*$/inet_protocols = $isp_postfix_protocols/g" /etc/postfix/main.cf
 sed -i "s/, check_policy_service unix:private\/quota-status$//g" /etc/postfix/main.cf
 
-#echo "UPDATE mysql.user SET Host = '%' WHERE User like 'ispc%';" | mysql -u root -h$isp_mysql_hostname -p$isp_mysql_root_password
-#echo "UPDATE mysql.db SET Host = '%' WHERE User like 'ispc%';" | mysql -u root -h$isp_mysql_hostname -p$isp_mysql_root_password
-#echo "FLUSH PRIVILEGES;" | mysql -u root -h$isp_mysql_hostname -p$isp_mysql_root_password
-
-# Bugfix ISPconfig mysql error
-echo "ALTER TABLE ${isp_mysql_master_database}.sys_user MODIFY passwort VARCHAR(140);"  | mysql -u root -h$isp_mysql_hostname -P$isp_mysql_port -p$isp_mysql_root_password
-echo "FLUSH PRIVILEGES;" | mysql -u root -h$isp_mysql_hostname -P$isp_mysql_port -p$isp_mysql_root_password
+# Bugfix ISPconfig mysql error (skip if DB not ready / fresh fail)
+if mysql -u root -h"$isp_mysql_hostname" -P"$isp_mysql_port" -p"$isp_mysql_root_password" \
+     -e "USE ${isp_mysql_master_database}; SHOW TABLES LIKE 'sys_user';" 2>/dev/null | grep -q sys_user;
+then
+  echo "ALTER TABLE ${isp_mysql_master_database}.sys_user MODIFY passwort VARCHAR(140);"  | mysql -u root -h$isp_mysql_hostname -P$isp_mysql_port -p$isp_mysql_root_password
+  echo "FLUSH PRIVILEGES;" | mysql -u root -h$isp_mysql_hostname -P$isp_mysql_port -p$isp_mysql_root_password
+fi
 
 # configure phpmyadmin
 envsubst < /root/phpmyadmin.ini > /etc/phpmyadmin/config.inc.php
