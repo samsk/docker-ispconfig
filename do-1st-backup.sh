@@ -32,6 +32,7 @@ then
     backup_path /etc/pure-ftpd/
     backup_path /etc/default/postgrey
     backup_path /etc/systemd/
+    backup_path /etc/valkey/
     dt=$(date '+%d/%m/%Y %H:%M:%S');
     echo "1st Backup Completed $dt" >> "$output"
     echo "1st Backup Completed $dt"

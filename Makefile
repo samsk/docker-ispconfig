@@ -1,7 +1,7 @@
 #Dockerfile vars
 
 #vars
-TAG=v3.2.12-1
+TAG=v3.2.12-2
 IMAGENAME=docker-ispconfig
 IMAGEFULLNAME=avhost/${IMAGENAME}
 BRANCH=${TAG}

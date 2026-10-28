@@ -68,6 +68,7 @@ services:
       isp_hostname: "<$HOSTNAME>"
       isp_use_ssl: "y"
       isp_php_version: "7.4"
+      isp_enable_redis: "n"
       isp_phpmyadmin_blowfish_secret: "advpDZ9wHZXkZSfV78DLRjzSPaTm5yBC"
       isp_change_mail_server: "y"
       isp_change_web_server: "y"
@@ -112,11 +113,21 @@ It's definitly not a microservice. :-) So, you cannot recreate the running conta
 
 This fork tracks [AVENTER-UG/docker-ispconfig](https://github.com/AVENTER-UG/docker-ispconfig) and keeps these extras:
 
+- **Ubuntu 24.04 (Noble)** base image
 - **systemd** as PID 1 (`CMD /sbin/init`) instead of supervisord
 - **pure-ftpd** with packaged config under `etc/pure-ftpd`
-- **multi-PHP** via `isp_php_versions_available` (default `7.4 8.1 8.2 8.3`) and `isp_php_version`
+- **multi-PHP** via `isp_php_versions_available` (default `7.4 8.1 8.2 8.3 8.4 8.5`) and `isp_php_version`
+- **Dovecot** for IMAP/POP (replaces Courier; apt packages on Noble)
+- **Valkey** optional (`isp_enable_redis=y` to start; php-redis always installed)
 - **`isp_mysql_port`** for non-default MySQL ports
+- Filesystem **quota/quotatool** packages installed (host mount must support quotas)
 - GitHub Actions workflow retained for image builds
 
 Sync upstream with: `git fetch upstream && git merge upstream/master`
+
+## Sponsors
+
+Thanks to my sponsor.
+
+![FERB](https://avatars.githubusercontent.com/u/98983967?s=60&v=4)
 

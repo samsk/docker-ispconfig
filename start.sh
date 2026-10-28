@@ -46,14 +46,8 @@ sed -i "s/, check_policy_service unix:private\/quota-status$//g" /etc/postfix/ma
 echo "ALTER TABLE ${isp_mysql_master_database}.sys_user MODIFY passwort VARCHAR(140);"  | mysql -u root -h$isp_mysql_hostname -P$isp_mysql_port -p$isp_mysql_root_password
 echo "FLUSH PRIVILEGES;" | mysql -u root -h$isp_mysql_hostname -P$isp_mysql_port -p$isp_mysql_root_password
 
-# Bugfix ISPconfig missing markerline
-envsubst < /root/authmysqlrc.ini > /etc/courier/authmysqlrc
-
 # configure phpmyadmin
 envsubst < /root/phpmyadmin.ini > /etc/phpmyadmin/config.inc.php
-
-mkdir -p /etc/courier/shared/index
-chmod -R 770 /etc/courier/shared
 
 rm -rf /var/run/saslauthd
 ln -sfn /var/spool/postfix/var/run/saslauthd /var/run/saslauthd
@@ -70,8 +64,8 @@ configure_service() {
    do
       if [ "$enable" = "y" ];
       then
-           systemctl enable "$i";
-           systemctl start "$i";
+           systemctl enable "$i" 2>/dev/null || true;
+           systemctl start "$i" 2>/dev/null || true;
       else
            systemctl disable "$i" 2>/dev/null || true;
            systemctl stop "$i" 2>/dev/null || true;
@@ -80,7 +74,7 @@ configure_service() {
 }
 
 configure_service "$isp_enable_mail" clamav-daemon.service amavis.service clamav-freshclam.service \
-   courier-authdaemon.service courier-imap-ssl.service courier-imap.service courier-pop-ssl.service courier-pop.service
+   dovecot.service
 
 configure_service "$isp_enable_dns" named
 
@@ -101,10 +95,15 @@ systemctl restart cron
 systemctl start postgrey
 systemctl start pure-ftpd
 
+# Valkey opt-in (default n)
+if systemctl list-unit-files valkey-server.service >/dev/null 2>&1; then
+  configure_service "$isp_enable_redis" valkey-server
+elif systemctl list-unit-files valkey.service >/dev/null 2>&1; then
+  configure_service "$isp_enable_redis" valkey
+fi
+
 # fix rncd erro
 chown root:bind /etc/bind/rndc.key
-# fix index permission error
-chown courier: /etc/courier/shared/index
 
 if [ -f "/var/backup/1st-backup-complete.log" ];
 then
